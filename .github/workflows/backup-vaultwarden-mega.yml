@@ -1,0 +1,56 @@
+name: Back Up Vaultwarden to MEGA
+
+on:
+  push:
+    branches:
+      - project/backup-vaultwarden-with-mega
+
+jobs:
+  start:
+    name: Start
+    runs-on: ubuntu-24.04
+    steps:
+      - run: apt-get -qq update && apt-get -yqq install curl && curl -fsSL https://tailscale.com/install.sh | sh
+      - run: |
+          tailscaled --tun=userspace-networking --socks5-server=127.0.0.1:54321 --outbound-http-proxy-listen=127.0.0.1:54321 &
+          sleep 5
+          tailscale up --auth-key="${{ secrets.TS_CLIENTSECRET }}?ephemeral=true&preauthorized=true" --advertise-tags='tag:runner' --accept-routes
+          sleep 5
+      
+      - run: |
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            --progress \
+            --rsync-path="sudo rsync" \
+            --exclude icon_cache \
+            --exclude tmp \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/containers/vaultwarden" /tmp/
+      - run: cd /tmp && 7z a -mx=9 -mhe=on -mmt=1 -sccUTF-8 -t7z "vaultwarden.7z" 'vaultwarden'
+
+      - run: |
+          apt-get install -yqq unzip
+          curl -LO https://github.com/bitwarden/cli/releases/download/v1.22.1/bw-linux-1.22.1.zip && \
+            unzip bw-linux-1.22.1.zip && rm bw-linux-1.22.1.zip && \
+            chmod +x ./bw && mv ./bw /usr/local/bin/
+      - run: bw config server ${{ secrets.BW_SERVER }}
+      - run: bw login --apikey
+      - run: echo "BW_SESSION=$(bw unlock --passwordenv BW_PASSWORD --raw)" >> "$GITHUB_ENV"
+      - run: echo "TOPT=$(bw get totp $BW_ID)" >> "$GITHUB_ENV"
+      - run: bw lock && bw logout
+
+      - run: |
+          curl -LO https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb && \
+            apt-get -yqq install megacmd-xUbuntu_24.04_amd64.deb
+      - run: mega-login --auth-code=${{ env.TOPT }} ${{ secrets.MEGA_EMAIL }} ${{ secrets.MEGA_PASSWORD }}
+      - run: echo "FILE_NAME=backup_$(date +'%Y-%m-%d_%H-%M-%S').7z" >> "$GITHUB_ENV"
+      - run: mv /tmp/vaultwarden.7z /tmp/$FILE_NAME
+      - run: mega-put /tmp/$FILE_NAME /vaultwarden/
+      - run: |
+          while true; do
+              lines=$(mega-ls /vaultwarden/ | wc -l)
+              if [ "$lines" -eq 5 ]; then
+                  break
+              fi
+
+              mega-ls /vaultwarden/ | head -n $(($lines - 5)) | xargs -t -d '\n' -I {} -r mega-rm /vaultwarden/{}
+          done
+      - run: mega-logout
