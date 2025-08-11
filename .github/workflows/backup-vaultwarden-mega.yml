@@ -10,11 +10,11 @@ jobs:
     name: Start
     runs-on: ubuntu-24.04
     steps:
-      - run: apt-get -qq update && apt-get -yqq install curl && curl -fsSL https://tailscale.com/install.sh | sh
+      - run: sudo apt-get -qq update && sudo apt-get -yqq install curl && curl -fsSL https://tailscale.com/install.sh | sh
       - run: |
-          tailscaled --tun=userspace-networking --socks5-server=127.0.0.1:54321 --outbound-http-proxy-listen=127.0.0.1:54321 &
+          sudo tailscaled --tun=userspace-networking --socks5-server=127.0.0.1:54321 --outbound-http-proxy-listen=127.0.0.1:54321 &
           sleep 5
-          tailscale up --auth-key="${{ secrets.TS_CLIENTSECRET }}?ephemeral=true&preauthorized=true" --advertise-tags='tag:runner' --accept-routes
+          sudo tailscale up --auth-key="${{ secrets.TS_CLIENTSECRET }}?ephemeral=true&preauthorized=true" --advertise-tags='tag:runner' --accept-routes
           sleep 5
       
       - run: |
@@ -27,10 +27,10 @@ jobs:
       - run: cd /tmp && 7z a -mx=9 -mhe=on -mmt=1 -sccUTF-8 -t7z "vaultwarden.7z" 'vaultwarden'
 
       - run: |
-          apt-get install -yqq unzip
+          sudo apt-get install -yqq unzip
           curl -LO https://github.com/bitwarden/cli/releases/download/v1.22.1/bw-linux-1.22.1.zip && \
             unzip bw-linux-1.22.1.zip && rm bw-linux-1.22.1.zip && \
-            chmod +x ./bw && mv ./bw /usr/local/bin/
+            chmod +x ./bw && sudo mv ./bw /usr/local/bin/
       - run: bw config server ${{ secrets.BW_SERVER }}
       - run: bw login --apikey
       - run: echo "BW_SESSION=$(bw unlock --passwordenv BW_PASSWORD --raw)" >> "$GITHUB_ENV"
@@ -39,7 +39,7 @@ jobs:
 
       - run: |
           curl -LO https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb && \
-            apt-get -yqq install megacmd-xUbuntu_24.04_amd64.deb
+            sudo apt-get -yqq install megacmd-xUbuntu_24.04_amd64.deb
       - run: mega-login --auth-code=${{ env.TOPT }} ${{ secrets.MEGA_EMAIL }} ${{ secrets.MEGA_PASSWORD }}
       - run: echo "FILE_NAME=backup_$(date +'%Y-%m-%d_%H-%M-%S').7z" >> "$GITHUB_ENV"
       - run: mv /tmp/vaultwarden.7z /tmp/$FILE_NAME
