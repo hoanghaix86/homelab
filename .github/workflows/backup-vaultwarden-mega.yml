@@ -32,7 +32,7 @@ jobs:
             unzip bw-linux-1.22.1.zip && rm bw-linux-1.22.1.zip && \
             chmod +x ./bw && sudo mv ./bw /usr/local/bin/
       - run: bw config server ${{ secrets.BW_SERVER }}
-      - run: bw login --apikey
+      - run: BW_CLIENTSECRET=${{ secrets.BW_CLIENTSECRET }} BW_CLIENTID=${{ secrets.BW_CLIENTID }} bw login --apikey
       - run: echo "BW_SESSION=$(bw unlock --passwordenv BW_PASSWORD --raw)" >> "$GITHUB_ENV"
       - run: echo "TOPT=$(bw get totp ${{ secrets.BW_ID }})" >> "$GITHUB_ENV"
       - run: bw lock && bw logout
