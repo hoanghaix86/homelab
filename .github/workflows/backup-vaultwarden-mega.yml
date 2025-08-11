@@ -34,7 +34,7 @@ jobs:
       - run: bw config server ${{ secrets.BW_SERVER }}
       - run: bw login --apikey
       - run: echo "BW_SESSION=$(bw unlock --passwordenv BW_PASSWORD --raw)" >> "$GITHUB_ENV"
-      - run: echo "TOPT=$(bw get totp $BW_ID)" >> "$GITHUB_ENV"
+      - run: echo "TOPT=$(bw get totp ${{ secrets.BW_ID }})" >> "$GITHUB_ENV"
       - run: bw lock && bw logout
 
       - run: |
