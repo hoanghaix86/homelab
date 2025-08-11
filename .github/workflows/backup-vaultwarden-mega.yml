@@ -39,7 +39,7 @@ jobs:
 
       - run: |
           curl -LO https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb && \
-            sudo apt-get -yqq install megacmd-xUbuntu_24.04_amd64.deb
+            sudo apt-get -y install "${PWD}/megacmd-xUbuntu_24.04_amd64.deb"
       - run: mega-login --auth-code=${{ env.TOPT }} ${{ secrets.MEGA_EMAIL }} ${{ secrets.MEGA_PASSWORD }}
       - run: echo "FILE_NAME=backup_$(date +'%Y-%m-%d_%H-%M-%S').7z" >> "$GITHUB_ENV"
       - run: mv /tmp/vaultwarden.7z /tmp/$FILE_NAME
