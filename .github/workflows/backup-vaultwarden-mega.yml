@@ -10,9 +10,15 @@ jobs:
     name: All in one
     runs-on: ubuntu-24.04
     steps:
+      - name: Private Key
+        run: |
+          mkdir -p "${HOME}/.ssh"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > "${HOME}/.ssh/private.key"
+          chmod 0600 "${HOME}/.ssh/private.key"
+
       - name: Sync data
         run: |
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${HOME}/.ssh/private.key" \
             --progress \
             --rsync-path="sudo rsync" \
             --exclude icon_cache \
