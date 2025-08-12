@@ -1,9 +1,8 @@
 name: Back Up Vaultwarden to MEGA
 
 on:
-  push:
-    branches:
-      - backup/vaultwarden
+  schedule:
+    - cron: "0 0 * * *"
 
 jobs:
   start:
