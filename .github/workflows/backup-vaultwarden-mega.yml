@@ -15,14 +15,33 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > "${HOME}/.ssh/private.key"
           chmod 0600 "${HOME}/.ssh/private.key"
 
+      - name: Shutdown container
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -i ${HOME}/.ssh/private.key \
+              "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+          cd ~/containers/vaultwarden && docker compose down
+          '
+
       - name: Sync data
         run: |
           rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${HOME}/.ssh/private.key" \
-            --progress \
-            --rsync-path="sudo rsync" \
-            --exclude icon_cache \
-            --exclude tmp \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/containers/vaultwarden" /tmp/
+                --progress \
+                --rsync-path="sudo rsync" \
+                --exclude icon_cache \
+                --exclude tmp \
+                "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/containers/vaultwarden" /tmp/
+
+      - name: Restart container
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -i ${HOME}/.ssh/private.key \
+              "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+          cd ~/containers/vaultwarden && docker compose up -d
+          '
+
       - name: Compress
         run: cd /tmp && 7z a -mx=9 -mhe=on -mmt=1 -sccUTF-8 -t7z "vaultwarden.7z" 'vaultwarden'
 
