@@ -1,0 +1,77 @@
+name: Back Up Vaultwarden to MEGA
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  start:
+    name: All in one
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Private Key
+        run: |
+          mkdir -p "${HOME}/.ssh"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > "${HOME}/.ssh/private.key"
+          chmod 0600 "${HOME}/.ssh/private.key"
+
+      - name: Shutdown container
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -i ${HOME}/.ssh/private.key \
+              "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+          cd ~/containers/01-cloudflare-tunnel && docker compose down vaultwarden
+          '
+
+      - name: Sync data
+        run: |
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${HOME}/.ssh/private.key" \
+                --progress \
+                --rsync-path="sudo rsync" \
+                --exclude icon_cache \
+                --exclude tmp \
+                "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/containers/01-cloudflare-tunnel" /tmp/vaultwarden
+
+      - name: Restart container
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -i ${HOME}/.ssh/private.key \
+              "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+          cd ~/containers/01-cloudflare-tunnel && docker compose up -d vaultwarden
+          '
+
+      - name: Compress
+        run: cd /tmp && 7z a -mx=9 -mhe=on -mmt=1 -sccUTF-8 -t7z "vaultwarden.7z" 'vaultwarden'
+
+      - name: Install Bitwarden CLI
+        run: |
+          sudo apt-get install -yqq unzip
+          curl -LO https://github.com/bitwarden/cli/releases/download/v1.22.1/bw-linux-1.22.1.zip && \
+            unzip bw-linux-1.22.1.zip && rm bw-linux-1.22.1.zip && \
+            chmod +x ./bw && sudo mv ./bw /usr/local/bin/
+
+      - run: bw config server ${{ secrets.BW_SERVER }}
+      - run: BW_CLIENTSECRET=${{ secrets.BW_CLIENTSECRET }} BW_CLIENTID=${{ secrets.BW_CLIENTID }} bw login --apikey
+      - run: echo "BW_SESSION=$(BW_PASSWORD=${{ secrets.BW_PASSWORD }} bw unlock --passwordenv BW_PASSWORD --raw)" >> "$GITHUB_ENV"
+      - run: echo "TOPT=$(bw get totp ${{ secrets.BW_ID }})" >> "$GITHUB_ENV"
+      - run: bw lock && bw logout
+
+      - run: |
+          curl -LO https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb && \
+            sudo apt-get -y install "${PWD}/megacmd-xUbuntu_24.04_amd64.deb"
+      - run: mega-login --auth-code=${{ env.TOPT }} ${{ secrets.MEGA_EMAIL }} ${{ secrets.MEGA_PASSWORD }}
+      - run: echo "FILE_NAME=backup_$(date +'%Y-%m-%d_%H-%M-%S').7z" >> "$GITHUB_ENV"
+      - run: mv /tmp/vaultwarden.7z /tmp/$FILE_NAME
+      - run: mega-put /tmp/$FILE_NAME /vaultwarden/
+      - run: |
+          while true; do
+              lines=$(mega-ls /vaultwarden/ | wc -l)
+              if [ "$lines" -eq 5 ]; then
+                  break
+              fi
+
+              mega-ls /vaultwarden/ | head -n $(($lines - 5)) | xargs -t -d '\n' -I {} -r mega-rm /vaultwarden/{}
+          done
+      - run: mega-logout

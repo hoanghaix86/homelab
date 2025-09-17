@@ -32,3 +32,11 @@ git commit -m 'chore: init repo'
 ```bash
 gh repo create --public --source=. --push
 ```
+
+5. GitHub Actions Secret
+
+```bash
+gh secret list
+gh secret set -f .env
+gh secret delete -f .env
+```
