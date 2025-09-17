@@ -1,5 +1,9 @@
 # HOMELAB
 
+## Diagram
+
+![Diagram](/attachments/001.png "Diagram")
+
 ## Repo
 
 1. Install `git`
